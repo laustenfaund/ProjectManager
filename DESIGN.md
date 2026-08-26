@@ -91,14 +91,51 @@ will still land in the same place.
   the same account using the same key names would collide. Keep other
   apps' keys distinct if this ever comes up.
 
+## Modularity: where it lives and where it deliberately doesn't
+
+The 12 core tabs (Overview through Photos/Files) are fixed and are staying
+that way. They aren't "a kind of thing you might have several of" — every
+project has exactly one Overview, one task list, one Budget. Making them
+pluggable would add configuration decisions with no corresponding
+flexibility gained, and would cost the app its main usability advantage:
+a new project starts pre-built and ready to type into, not assembled from
+parts first.
+
+Special Orders is the one place modularity is real, because it's the one
+category that's inherently open-ended — you don't know in advance how many
+trades/material categories a given project needs, and they're all the same
+*kind* of thing. That's where the module system lives:
+
+- Each category gets its **own configurable field list**, instead of every
+  category being forced onto the same fixed 9 columns.
+- Categories can be **deleted** (removes the category and its local data;
+  does not touch anything already synced to Google).
+- **Not built yet:** subgroups/nesting (e.g. a "Materials" parent holding
+  "Cabinets"/"Flooring" as children) and alternate module types (local
+  checklist, freeform notes) beyond the existing Sheets-synced table. Both
+  are real future possibilities, not ruled out — just not needed until a
+  flat list of categories actually gets unwieldy in practice.
+
+**Constraint for whenever subgroups do get built:** any emergent
+group/subgroup structure needs to show up in how the Drive artifacts are
+organized too, not just in the app's own UI. Google Sheets has no
+folder-of-tabs concept, so the honest way to do this *within* a
+spreadsheet is tab naming + tab color (e.g. "Materials — Cabinets" /
+"Materials — Flooring", adjacent, same color) rather than pretending Sheets
+tabs can be literally nested. Whether a subgroup ever warrants becoming its
+*own* separate Drive artifact (rather than just tabs within the one
+project spreadsheet) is a real design fork, not a default — ask before
+building that, don't assume it.
+
 ## Explicit non-goals (for now)
 
 - Two-way Sheets sync, or any read-back from Google.
-- Category deletion (Special Orders categories can be added but not
-  removed via the UI).
 - A loading/progress indicator during Drive/Sheets operations.
 - Data export/backup beyond the existing one-way Google sync.
 - Multi-user / multi-device support of any kind.
+- An LLM/AI feature of any kind (deliberately parked — the mechanism
+  (bring-your-own API key, same pattern as two other apps) is understood,
+  but no concrete in-app use case has been chosen yet).
 
 None of these are ruled out permanently — they're just out of scope for the
 current single-user, single-device, bring-your-own-Google-project design.

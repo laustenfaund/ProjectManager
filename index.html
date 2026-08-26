@@ -322,11 +322,15 @@ These come from your own Google Cloud project (free tier). See the setup notes p
 
    <!-- New Category Modal -->
    <div class="modal-overlay" id="newCategoryModal">
-      <div class="modal">
+      <div class="modal" style="width:460px;">
          <h3>New Category</h3>
       <div class="field-group">
       <label class="field-label">Category Name</label>
       <input class="field-input" id="ncName" placeholder="e.g. Cabinets, Flooring, Lighting Fixtures">
+      </div>
+      <div class="field-group">
+      <label class="field-label">Fields (one per line — edit, add, or remove any)</label>
+      <textarea class="freeform" id="ncFields" style="min-height:180px;font-size:13px;"></textarea>
       </div>
       <div class="modal-actions">
       <button class="btn secondary" onclick="App.closeModal('newCategoryModal')">Cancel</button>
@@ -474,21 +478,41 @@ const App = {
   },
 openNewCategoryModal(){
    document.getElementById('ncName').value='';
+   document.getElementById('ncFields').value = STANDARD_HEADERS.join('\n');
          document.getElementById('newCategoryModal').classList.add('show');
 },
    createCategory(){
       const name = document.getElementById('ncName').value.trim();
        if(!name){ alert('Category name required.'); return; }
+      const fields = document.getElementById('ncFields').value.split('\n').map(f=>f.trim()).filter(Boolean);
+      if(!fields.length){ alert('At least one field is required.'); return; }
       const p = this.getActiveProject();
       if(!p) return;
       p.data.categories = p.data.categories || [];
       const id = 'cat_' + Date.now();
-      p.data.categories.push({id, name});
+      p.data.categories.push({id, name, fields});
       p.data.seedTables = p.data.seedTables || {};
       p.data.seedTables[id] = [];
       this.persistProjects();
       this.closeModal('newCategoryModal');
       this.state.activeTab = id;
+      this.refreshCurrentView();
+   },
+   renderDeleteCategoryRow(cat){
+      return `<div class="save-row" style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px;">
+        <button class="btn danger" onclick="App.deleteCategory('${cat.id}')">Delete Category</button>
+      </div>`;
+   },
+   deleteCategory(id){
+      const p = this.getActiveProject();
+      if(!p) return;
+      const cat = (p.data.categories||[]).find(c=>c.id===id);
+      if(!cat) return;
+      if(!confirm(`Delete category "${cat.name}"? This removes it and its rows from this browser only (any Sheets tab already synced to Google is untouched).`)) return;
+      p.data.categories = p.data.categories.filter(c=>c.id!==id);
+      if(p.data.seedTables) delete p.data.seedTables[id];
+      if(this.state.activeTab === id) this.state.activeTab = 'overview';
+      this.persistProjects();
       this.refreshCurrentView();
    },
    deleteActiveProject(){
@@ -649,7 +673,7 @@ buildTabList(p){
       case 'changeOrders': body = this.renderSheetTable(p,'changeOrders',['CO Number','Date','Originating Scope/Reason','Description of Change','Cost Impact','Schedule Impact','Approval/Sign-off'],['','','','','','',''],'none'); break;
       case 'subcontractors': body = this.renderSheetTable(p,'subcontractors',['Contact Name','Company Name','Trade','Phone Number','Email','Flags','Notes'],['','','','','','',''],'none'); break;
       case 'photos': body = this.renderPhotos(p); break;
-   default: { const cat = (p.data.categories||[]).find(c=>c.id===t); if(cat){ body = this.renderSheetTable(p, cat.id, STANDARD_HEADERS, STANDARD_HEADERS.map(()=>''), 'select-status-standard'); } }
+   default: { const cat = (p.data.categories||[]).find(c=>c.id===t); if(cat){ const fields = cat.fields || STANDARD_HEADERS; body = this.renderSheetTable(p, cat.id, fields, fields.map(()=>''), 'select-status-standard') + this.renderDeleteCategoryRow(cat); } }
     }
     const tabDef = this.buildTabList(p).find(x=>x.id===t);
     const metaLabelMap = {
@@ -857,11 +881,13 @@ computeBudgetTotals(p){
    let projected = 0, actual = 0;
      const budgetRows = (p.data.seedTables && p.data.seedTables.budget) || [];
    budgetRows.forEach(r=>{ projected += toNum(r[3]); actual += toNum(r[4]); });
-         const pIdx = STANDARD_HEADERS.indexOf('Projected Cost');
-   const aIdx = STANDARD_HEADERS.indexOf('Actual Cost');
    (p.data.categories||[]).forEach(c=>{
       const rows = (p.data.seedTables && p.data.seedTables[c.id]) || [];
-     rows.forEach(r=>{ projected += toNum(r[pIdx]); actual += toNum(r[aIdx]); });
+      const fields = c.fields || STANDARD_HEADERS;
+      const cpIdx = fields.indexOf('Projected Cost');
+      const caIdx = fields.indexOf('Actual Cost');
+      if(cpIdx === -1 && caIdx === -1) return; // this category's fields don't track cost
+     rows.forEach(r=>{ if(cpIdx>-1) projected += toNum(r[cpIdx]); if(caIdx>-1) actual += toNum(r[caIdx]); });
    });
    return {projected, actual, variance: actual - projected};
    },
@@ -1158,7 +1184,7 @@ const authed = this.state.google.connected;
           changeOrders: ['CO Number','Date','Originating Scope/Reason','Description of Change','Cost Impact','Schedule Impact','Approval/Sign-off'],
           subcontractors: ['Contact Name','Company Name','Trade','Phone Number','Email','Flags','Notes'],
      };
-          (p.data.categories||[]).forEach(c => { map[c.id] = STANDARD_HEADERS; });
+          (p.data.categories||[]).forEach(c => { map[c.id] = c.fields || STANDARD_HEADERS; });
           return map;
      },
 async findOrCreateFolder(name, parentId){
