@@ -265,6 +265,10 @@ padding:24px;width:420px;max-width:90vw;
 <div class="gstat-row"><span class="dot" id="gDot"></span><span id="gStatusText">Google: not connected</span></div>
 <button class="btn-mini" onclick="App.openGoogleSetup()">Connect / Setup</button>
 </div>
+<div class="google-status">
+<button class="btn-mini" style="border-color:var(--red);color:var(--red);" onclick="App.openClearAllDataModal()">Clear All Data</button>
+<div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-dim);line-height:1.5;margin-top:8px;">Everything lives only in this browser. Nothing syncs to Google unless you connect and click a sync button per tab. No export/backup exists — clearing this browser's data is permanent.</div>
+</div>
 </aside>
 
 <main class="main">
@@ -307,7 +311,7 @@ padding:24px;width:420px;max-width:90vw;
 <input class="field-input" id="gApiKey" placeholder="AIza...">
 </div>
 <p style="font-size:12px;color:var(--ink-dim);line-height:1.6;">
-These come from your own Google Cloud project (free tier). See the setup notes provided with this app for the exact steps. Stored only in this browser.
+These come from your own Google Cloud project (free tier). See the setup notes provided with this app for the exact steps. Stored only in this browser's local storage — never sent anywhere except directly to Google when you connect. Anyone with access to this browser profile can read them back out; treat the API key like a password. This connection doesn't persist across a page reload — you'll reconnect each session.
 </p>
 <div class="modal-actions">
 <button class="btn secondary" onclick="App.closeModal('googleSetupModal')">Cancel</button>
@@ -328,6 +332,18 @@ These come from your own Google Cloud project (free tier). See the setup notes p
       <button class="btn secondary" onclick="App.closeModal('newCategoryModal')">Cancel</button>
       <button class="btn" onclick="App.createCategory()">Create</button>
       </div>
+      </div>
+   </div>
+
+   <!-- Clear All Data Modal -->
+   <div class="modal-overlay" id="clearAllDataModal">
+      <div class="modal">
+         <h3>Clear All Data</h3>
+         <div id="clearAllDataSummary" style="font-size:13px;color:var(--ink-dim);line-height:1.6;margin-bottom:4px;"></div>
+         <div class="modal-actions">
+         <button class="btn secondary" onclick="App.closeModal('clearAllDataModal')">Cancel</button>
+         <button class="btn danger" onclick="App.confirmClearAllData()">Clear Everything</button>
+         </div>
       </div>
    </div>
 
@@ -364,16 +380,39 @@ const App = {
     window.addEventListener('load', ()=> this.tryInitGoogle());
   },
 
+  safeStorage: {
+    get(key){
+      try{ return localStorage.getItem(key); }
+      catch(e){ console.error('localStorage read failed for', key, e); return null; }
+    },
+    set(key, value){
+      try{ localStorage.setItem(key, value); return true; }
+      catch(e){
+        console.error('localStorage write failed for', key, e);
+        alert('Could not save to this browser\'s storage (it may be full or blocked). Your last change may not have been saved.');
+        return false;
+      }
+    },
+    remove(key){
+      try{ localStorage.removeItem(key); }
+      catch(e){ console.error('localStorage remove failed for', key, e); }
+    }
+  },
   loadFromStorage(){
-    const raw = localStorage.getItem('sl_projects');
-    this.state.projects = raw ? JSON.parse(raw) : [];
-    this.state.activeProjectId = localStorage.getItem('sl_active_project') || null;
+    const raw = this.safeStorage.get('sl_projects');
+    try{
+      this.state.projects = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      console.error('Saved project data was unreadable (corrupted JSON) — starting from an empty list.', e);
+      this.state.projects = [];
+    }
+    this.state.activeProjectId = this.safeStorage.get('sl_active_project') || null;
   },
   persistProjects(){
-    localStorage.setItem('sl_projects', JSON.stringify(this.state.projects));
+    this.safeStorage.set('sl_projects', JSON.stringify(this.state.projects));
   },
   persistActive(){
-    localStorage.setItem('sl_active_project', this.state.activeProjectId);
+    this.safeStorage.set('sl_active_project', this.state.activeProjectId);
   },
    migrateLegacyCategories(){
    this.state.projects.forEach(p=>{
@@ -460,6 +499,34 @@ openNewCategoryModal(){
     this.state.activeProjectId = this.state.projects.length ? this.state.projects[0].id : null;
     this.persistProjects();
     this.persistActive();
+    this.refreshCurrentView();
+  },
+
+  openClearAllDataModal(){
+    const n = this.state.projects.length;
+    const names = this.state.projects.map(p => p.name || '(unnamed project)');
+    const hasGoogleConfig = !!(this.state.google.clientId || this.state.google.apiKey);
+    const lines = [];
+    lines.push(`<div style="margin-bottom:8px;"><b style="color:var(--ink);">This permanently deletes, from this browser only:</b></div>`);
+    lines.push(`<div style="margin-bottom:8px;">${n ? `${n} project${n===1?'':'s'} — ${names.map(escapeHtml).join(', ')}` : 'No projects currently saved.'}</div>`);
+    lines.push(`<div style="margin-bottom:8px;">${hasGoogleConfig ? 'Your saved Google OAuth Client ID and API key.' : 'No saved Google configuration.'}</div>`);
+    lines.push(`<div style="color:var(--red);">This cannot be undone. Anything here that isn't already synced to Google Sheets, Docx, or Drive is gone for good. Data already sitting in Google (Sheets, Docs, Drive folders) is untouched — this only clears this browser.</div>`);
+    document.getElementById('clearAllDataSummary').innerHTML = lines.join('');
+    document.getElementById('clearAllDataModal').classList.add('show');
+  },
+  confirmClearAllData(){
+    this.safeStorage.remove('sl_projects');
+    this.safeStorage.remove('sl_active_project');
+    this.safeStorage.remove('sl_google_config');
+    this.state.projects = [];
+    this.state.activeProjectId = null;
+    this.state.google.clientId = '';
+    this.state.google.apiKey = '';
+    this.state.google.connected = false;
+    this.state.google.tokenClient = null;
+    this.state.google.accessToken = null;
+    this.closeModal('clearAllDataModal');
+    this.updateGoogleStatus();
     this.refreshCurrentView();
   },
 
@@ -995,11 +1062,15 @@ const authed = this.state.google.connected;
 
   /* ---------- GOOGLE INTEGRATION ---------- */
   loadGoogleConfig(){
-    const cfg = localStorage.getItem('sl_google_config');
+    const cfg = this.safeStorage.get('sl_google_config');
     if(cfg){
-      const parsed = JSON.parse(cfg);
-      this.state.google.clientId = parsed.clientId;
-      this.state.google.apiKey = parsed.apiKey;
+      try{
+        const parsed = JSON.parse(cfg);
+        this.state.google.clientId = parsed.clientId;
+        this.state.google.apiKey = parsed.apiKey;
+      }catch(e){
+        console.error('Saved Google config was unreadable (corrupted JSON) — ignoring it.', e);
+      }
     }
   },
   openGoogleSetup(){
@@ -1013,7 +1084,7 @@ const authed = this.state.google.connected;
     if(!clientId || !apiKey){ alert('Both fields required.'); return; }
     this.state.google.clientId = clientId;
     this.state.google.apiKey = apiKey;
-    localStorage.setItem('sl_google_config', JSON.stringify({clientId, apiKey}));
+    this.safeStorage.set('sl_google_config', JSON.stringify({clientId, apiKey}));
     this.closeModal('googleSetupModal');
     this.tryInitGoogle(true);
   },
