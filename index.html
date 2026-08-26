@@ -525,6 +525,15 @@ openNewCategoryModal(){
     this.persistActive();
     this.refreshCurrentView();
   },
+  openProjectDriveFolder(){
+    const p = this.getActiveProject();
+    if(!p) return;
+    if(!p.driveFolderId){
+      alert('This project doesn\'t have a Drive folder yet. Sync something first — click "Create Google Sheet" on any Sheets tab, "Generate Docx" here on Overview, or "Create Drive Folders" on Photos/Files — then try again.');
+      return;
+    }
+    window.open(`https://drive.google.com/drive/folders/${p.driveFolderId}`, '_blank', 'noopener');
+  },
 
   openClearAllDataModal(){
     const n = this.state.projects.length;
@@ -721,6 +730,7 @@ buildTabList(p){
       <div class="save-row">
         <button class="btn" onclick="App.saveOverview()">Save</button>
         <button class="btn secondary" onclick="App.generateDocx('overview')">Generate Docx</button>
+        <button class="btn secondary" onclick="App.openProjectDriveFolder()">Share Project (Open Drive Folder)</button>
         <button class="btn danger" onclick="App.deleteActiveProject()">Delete Project</button>
       </div>
       ${this.renderDocxStatus(p,'overview')}`;
