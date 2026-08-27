@@ -58,3 +58,16 @@ in the sidebar.
 
 This repo is set up for GitHub Pages, serving `index.html` directly from
 `main`. Pushing to `main` deploys the update.
+
+## Installing on your phone
+
+`manifest.json`, `sw.js`, and `icons/` make this app installable as a PWA
+once hosted over `https://` (e.g. GitHub Pages) — a real app icon, name, and
+a minimal offline shell cache instead of just a bookmark.
+
+1. Make this repo public (Settings → Danger Zone → Change visibility), then
+   enable GitHub Pages (Settings → Pages → Deploy from branch → `main` → `/`
+   root).
+2. Once it's live, open `https://<your-username>.github.io/ProjectHub/` on
+   your phone.
+3. Use your browser's "Add to Home Screen" / "Install app" option.
