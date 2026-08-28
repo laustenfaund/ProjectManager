@@ -2,7 +2,7 @@
 // offline and so Chrome/Android recognize this as a real installable PWA.
 // This only caches the static shell, never any of your project data or
 // Google credentials.
-const CACHE = 'projecthub-shell-v1';
+const CACHE = 'projecthub-shell-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
