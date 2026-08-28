@@ -68,6 +68,10 @@ a minimal offline shell cache instead of just a bookmark.
 1. Make this repo public (Settings → Danger Zone → Change visibility), then
    enable GitHub Pages (Settings → Pages → Deploy from branch → `main` → `/`
    root).
-2. Once it's live, open `https://<your-username>.github.io/ProjectHub/` on
+2. Once it's live, open `https://<your-username>.github.io/ProjectManager/` on
    your phone.
 3. Use your browser's "Add to Home Screen" / "Install app" option.
+
+## License
+
+All rights reserved — see [`LICENSE`](LICENSE). This repository is shared for personal reference; reuse requires asking first.
